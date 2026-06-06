@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local/runtime artifacts
+python312/
+antlr4_python3_runtime-4.13.2/
+antlr-*.jar
+
+# Generated reports and local deliverables
+artifacts/
+build_updated_report.py
+*.pdf
+*.docx

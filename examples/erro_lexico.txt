@@ -1,0 +1,6 @@
+PROGRAM teste;
+VAR
+    nome@ : INTEGER;
+BEGIN
+    nome := 1
+END.

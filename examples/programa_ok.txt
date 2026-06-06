@@ -1,0 +1,20 @@
+PROGRAM exemplo;
+VAR
+    contador, limite : INTEGER;
+    ativo : BOOLEAN;
+BEGIN
+    contador := 0;
+    limite := 3;
+    ativo := TRUE;
+
+    WHILE contador < limite DO
+    BEGIN
+        WRITE("contador atual", contador);
+        contador := contador + 1
+    END;
+
+    IF ativo AND contador == limite THEN
+        WRITE("fim")
+    ELSE
+        WRITE("erro")
+END.
