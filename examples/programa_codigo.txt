@@ -1,0 +1,14 @@
+PROGRAM codigo;
+VAR
+    x, y : INTEGER;
+    ok : BOOLEAN;
+BEGIN
+    READ(x);
+    y := x * 2 + 1;
+    ok := y >= 10;
+
+    IF ok THEN
+        WRITE("valor aceito", y)
+    ELSE
+        WRITE("valor baixo")
+END.

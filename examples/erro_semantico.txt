@@ -1,0 +1,9 @@
+PROGRAM exemplo;
+VAR
+    contador : INTEGER;
+    ativo : BOOLEAN;
+BEGIN
+    contador := TRUE;
+    ativo := contador < 10;
+    WRITE(naoDeclarada)
+END.

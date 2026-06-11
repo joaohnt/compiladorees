@@ -1,5 +1,7 @@
+import argparse
 from pathlib import Path
 import sys
+from typing import Optional
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
@@ -8,7 +10,9 @@ from antlr4 import CommonTokenStream, FileStream
 from antlr4.error.ErrorListener import ErrorListener
 from antlr4.tree.Trees import Trees
 
+from compiler.codegen import GeradorCodigo
 from compiler.errors import CompilerError
+from compiler.semantic import AnalisadorSemantico, normalizar_identificador
 from generated.CompiladorLexer import CompiladorLexer
 from generated.CompiladorParser import CompiladorParser
 
@@ -55,19 +59,9 @@ def validar_token(token, nomes_simbolicos):
             f"Erro lexico na linha {token.line}, coluna {token.column}: simbolo invalido '{texto}'."
         )
 
-    if tipo == "ID" and len(texto) > 16:
-        raise CompilerError(
-            f"Erro lexico na linha {token.line}, coluna {token.column}: identificador '{texto}' excede o limite de 16 caracteres."
-        )
-
     if tipo == "UNCLOSED_STRING":
         raise CompilerError(
             f"Erro lexico na linha {token.line}, coluna {token.column}: cadeia nao fechada."
-        )
-
-    if tipo == "CTE" and int(texto) > 32768:
-        raise CompilerError(
-            f"Erro lexico na linha {token.line}, coluna {token.column}: constante inteira fora do limite de 2 bytes."
         )
 
 
@@ -76,7 +70,7 @@ def descrever_token(token, nomes_simbolicos):
     texto = token.text or ""
 
     if tipo == "ID":
-        atributo = texto[:16]
+        atributo = normalizar_identificador(texto)
     elif tipo == "CTE":
         atributo = texto
     elif tipo == "CADEIA":
@@ -149,7 +143,7 @@ def _encontrar_contextos(contexto, tipo_contexto):
         yield from _encontrar_contextos(filho, tipo_contexto)
 
 
-def compilar_arquivo(caminho_fonte: Path):
+def compilar_arquivo(caminho_fonte: Path, caminho_codigo: Optional[Path] = None):
     validar_cadeias(caminho_fonte.read_text(encoding="utf-8"))
     entrada = FileStream(str(caminho_fonte), encoding="utf-8")
     lexer = CompiladorLexer(entrada)
@@ -164,6 +158,11 @@ def compilar_arquivo(caminho_fonte: Path):
         if token.type == -1:
             continue
         validar_token(token, lexer.symbolicNames)
+        if lexer.symbolicNames[token.type] == "ID" and len(token.text or "") > 16:
+            print(
+                f"Aviso lexico na linha {token.line}, coluna {token.column}: "
+                f"identificador '{token.text}' truncado para '{normalizar_identificador(token.text or '')}'."
+            )
         print(descrever_token(token, lexer.symbolicNames))
 
     parser = CompiladorParser(tokens)
@@ -175,19 +174,46 @@ def compilar_arquivo(caminho_fonte: Path):
     print("\n=== ARVORE SINTATICA ===")
     print(Trees.toStringTree(arvore, None, parser))
 
+    analisador_semantico = AnalisadorSemantico()
+    tabela_simbolos = analisador_semantico.visit(arvore)
+
+    print("\n=== TABELA DE SIMBOLOS ===")
+    for entrada_simbolo in tabela_simbolos.entradas():
+        print(
+            f"{entrada_simbolo.nome:<18} tipo={entrada_simbolo.tipo:<8} "
+            f"deslocamento={entrada_simbolo.deslocamento:<4} escopo={entrada_simbolo.escopo}"
+        )
+
+    codigo = GeradorCodigo(tabela_simbolos).gerar(arvore)
+    print("\n=== CODIGO GERADO ===")
+    print(codigo)
+
+    if caminho_codigo is not None:
+        caminho_codigo.write_text(codigo + "\n", encoding="utf-8")
+        print(f"\nCodigo gerado salvo em: {caminho_codigo}")
+
+    return codigo
+
 
 def main():
-    if len(sys.argv) != 2:
-        print("Uso: python src/main.py <arquivo-fonte>")
-        sys.exit(1)
+    parser_argumentos = argparse.ArgumentParser(description="Compilador simples com ANTLR4.")
+    parser_argumentos.add_argument("arquivo_fonte", help="arquivo fonte a ser compilado")
+    parser_argumentos.add_argument(
+        "-o",
+        "--saida-codigo",
+        help="arquivo onde o codigo gerado sera salvo",
+    )
+    argumentos = parser_argumentos.parse_args()
 
-    caminho_fonte = Path(sys.argv[1]).resolve()
+    caminho_fonte = Path(argumentos.arquivo_fonte).resolve()
     if not caminho_fonte.exists():
         print(f"Arquivo nao encontrado: {caminho_fonte}")
         sys.exit(1)
 
+    caminho_codigo = Path(argumentos.saida_codigo).resolve() if argumentos.saida_codigo else None
+
     try:
-        compilar_arquivo(caminho_fonte)
+        compilar_arquivo(caminho_fonte, caminho_codigo)
     except Exception as exc:
         print(exc)
         sys.exit(1)
